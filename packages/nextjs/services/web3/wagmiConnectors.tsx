@@ -14,7 +14,7 @@ import scaffoldConfig, { localNode } from "~~/scaffold.config";
 const { onlyLocalBurnerWallet, targetNetworks } = scaffoldConfig;
 
 // Define which chains are considered 'local'
-const localChainIds = [chains.hardhat.id, localNode.id];
+const localChainIds: number[] = [chains.hardhat.id, localNode.id];
 
 const wallets = [
   metaMaskWallet,
@@ -46,7 +46,7 @@ export const wagmiConnectors = () => {
       },
     ],
     {
-      appName: 'scaffold-dot',
+      appName: "scaffold-dot",
       projectId: scaffoldConfig.walletConnectProjectId,
     },
   );

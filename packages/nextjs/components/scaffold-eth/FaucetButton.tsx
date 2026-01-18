@@ -1,13 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { createWalletClient, http, parseEther, parseUnits } from "viem";
-import { hardhat } from "viem/chains";
+import { localNode } from "../../scaffold.config";
+import { createWalletClient, http, parseUnits } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { localNode, LOCAL_CHAIN_GAS_CONFIG } from "../../scaffold.config"
 import { useAccount } from "wagmi";
 import { BanknotesIcon } from "@heroicons/react/24/outline";
-import { useTransactor } from "~~/hooks/scaffold-eth";
 import { useWatchBalance } from "~~/hooks/scaffold-eth/useWatchBalance";
 
 // Number of ETH faucet sends to an address
@@ -30,8 +28,6 @@ export const FaucetButton = () => {
 
   const [loading, setLoading] = useState(false);
 
-  const faucetTxn = useTransactor(localWalletClient);
-
   const sendETH = async () => {
     if (!address) return;
     try {
@@ -43,7 +39,7 @@ export const FaucetButton = () => {
         value: parseUnits(NUM_OF_ETH, 18),
       });
 
-      console.log("Transaction sent:", hash)
+      console.log("Transaction sent:", hash);
       setLoading(false);
     } catch (error) {
       console.error("⚡️ ~ file: FaucetButton.tsx:sendETH ~ error", error);

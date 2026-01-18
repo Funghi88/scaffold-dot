@@ -45,7 +45,7 @@ module.exports = {
   
   // use "localhost" to deploy to local node that will connect from nextjs frontend
   // use "passetHub" to deploy to Paseo Asset Hub test network
-  defaultNetwork: "localNode",
+  defaultNetwork: "passetHub", // Changed to Paseo testnet for deployment
   namedAccounts: {
     deployer: {
       default: 0, // here this will by default take the first account as deployer

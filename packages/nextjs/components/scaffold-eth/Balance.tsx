@@ -1,6 +1,6 @@
 "use client";
 
-import { Address, formatEther, formatUnits } from "viem";
+import { Address, formatUnits } from "viem";
 import { useDisplayUsdMode } from "~~/hooks/scaffold-eth/useDisplayUsdMode";
 import { useTargetNetwork } from "~~/hooks/scaffold-eth/useTargetNetwork";
 import { useWatchBalance } from "~~/hooks/scaffold-eth/useWatchBalance";

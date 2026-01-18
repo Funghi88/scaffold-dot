@@ -1,39 +1,18 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# ============================================
+# Next.js package-specific .gitignore
+# Common ignores are in root .gitignore
+# ============================================
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.js
-
-# testing
+# Testing
 /coverage
 
-# next.js
+# Next.js build outputs
 /.next/
 /out/
 .vercel
 
-# production
+# Production build
 /build
 
-# misc
-.DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# local env files
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# typescript
-*.tsbuildinfo
-
+# IPFS upload config
 ipfs-upload.config.json

@@ -1,18 +1,17 @@
-# dependencies
-node_modules
+# ============================================
+# Hardhat package-specific .gitignore
+# Common ignores are in root .gitignore
+# ============================================
 
-# env files
-.env
-
-# coverage
+# Coverage
 coverage
 coverage.json
 
-# typechain
+# TypeChain
 typechain
 typechain-types
 
-# hardhat files
+# Hardhat build artifacts
 cache
 artifacts
 
@@ -20,11 +19,8 @@ artifacts
 artifacts-zk
 cache-zk
 
-# deployments
+# Deployments
 deployments/localhost
 
-# typescript
-*.tsbuildinfo
-
-# other
+# Temporary files
 temp

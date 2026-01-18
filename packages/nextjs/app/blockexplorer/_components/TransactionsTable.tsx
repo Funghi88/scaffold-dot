@@ -57,7 +57,8 @@ export const TransactionsTable = ({ blocks, transactionReceipts }: TransactionsT
                       )}
                     </td>
                     <td className="text-right md:py-4">
-                      {formatUnits(tx.value, targetNetwork.nativeCurrency.decimals)} {targetNetwork.nativeCurrency.symbol}
+                      {formatUnits(tx.value, targetNetwork.nativeCurrency.decimals)}{" "}
+                      {targetNetwork.nativeCurrency.symbol}
                     </td>
                   </tr>
                 );

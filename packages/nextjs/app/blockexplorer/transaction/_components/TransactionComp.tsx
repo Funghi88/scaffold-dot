@@ -87,7 +87,8 @@ const TransactionComp = ({ txHash }: { txHash: Hash }) => {
                   <strong>Value:</strong>
                 </td>
                 <td>
-                  {formatUnits(transaction.value, targetNetwork.nativeCurrency.decimals)} {targetNetwork.nativeCurrency.symbol}
+                  {formatUnits(transaction.value, targetNetwork.nativeCurrency.decimals)}{" "}
+                  {targetNetwork.nativeCurrency.symbol}
                 </td>
               </tr>
               <tr>

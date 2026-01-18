@@ -1,10 +1,9 @@
+import { Unbounded } from "next/font/google";
 import "@rainbow-me/rainbowkit/styles.css";
 import { ScaffoldEthAppWithProviders } from "~~/components/ScaffoldEthAppWithProviders";
 import { ThemeProvider } from "~~/components/ThemeProvider";
 import "~~/styles/globals.css";
 import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
-import { Unbounded } from "next/font/google";
-import Script from "next/script";
 
 export const metadata = getMetadata({
   title: "Scaffold-DOT App",
@@ -12,20 +11,11 @@ export const metadata = getMetadata({
 });
 
 const unbounded = Unbounded({
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-unbounded',
-  weight: [
-    '200',
-    '300',
-    '400',
-    '500',
-    '600',
-    '700',
-    '800',
-    '900'
-  ]
-})
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-unbounded",
+  weight: ["200", "300", "400", "500", "600", "700", "800", "900"],
+});
 
 const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
   return (

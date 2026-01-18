@@ -18,7 +18,10 @@ const generatedContractComment = `
 `;
 
 const DEPLOYMENTS_DIR = "./deployments";
-const ARTIFACTS_DIR = "./artifacts-pvm";
+// Try Foundry artifacts first, fallback to Hardhat artifacts
+const FOUNDRY_ARTIFACTS_DIR = "./foundry/out";
+const HARDHAT_ARTIFACTS_DIR = "./artifacts-pvm";
+const ARTIFACTS_DIR = fs.existsSync(FOUNDRY_ARTIFACTS_DIR) ? FOUNDRY_ARTIFACTS_DIR : HARDHAT_ARTIFACTS_DIR;
 
 function getDirectories(path: string) {
   return fs
@@ -38,7 +41,16 @@ function getActualSourcesForContract(sources: Record<string, any>, contractName:
   for (const sourcePath of Object.keys(sources)) {
     const sourceName = sourcePath.split("/").pop()?.split(".sol")[0];
     if (sourceName === contractName) {
-      const contractContent = sources[sourcePath].content as string;
+      // Foundry metadata structure: sources[path] = { content: "..." }
+      // Hardhat metadata structure: sources[path] = { content: "..." }
+      const sourceData = sources[sourcePath];
+      if (!sourceData || typeof sourceData !== 'object') {
+        continue;
+      }
+      const contractContent = sourceData.content as string;
+      if (!contractContent || typeof contractContent !== 'string') {
+        continue;
+      }
       const regex = /contract\s+(\w+)\s+is\s+([^{}]+)\{/;
       const match = contractContent.match(regex);
 
@@ -77,12 +89,22 @@ function getInheritedFunctions(sources: Record<string, any>, contractName: strin
 
 /**
  * Get all contract artifact names from a .sol file
- * Scans the artifacts-pvm directory and returns all contract names (excluding .dbg.json files)
+ * Scans the artifacts directory (Foundry or Hardhat) and returns all contract names (excluding .dbg.json files)
  */
 function getAllContractArtifactsFromSolFile(solFileName: string): string[] {
+  // Foundry structure: foundry/out/contracts/ERC20.sol/ERC20Token.json
+  // Hardhat structure: artifacts-pvm/contracts/ERC20.sol/ERC20Token.json
   const solDirPath = `${ARTIFACTS_DIR}/contracts/${solFileName}`;
   
   if (!fs.existsSync(solDirPath)) {
+    // Try Foundry's alternative structure: foundry/out/ERC20.sol/ERC20Token.json
+    const foundryAltPath = `${FOUNDRY_ARTIFACTS_DIR}/${solFileName}`;
+    if (fs.existsSync(foundryAltPath)) {
+      const files = fs.readdirSync(foundryAltPath, { withFileTypes: true });
+      return files
+        .filter(dirent => dirent.isFile() && dirent.name.endsWith('.json') && !dirent.name.endsWith('.dbg.json'))
+        .map(dirent => dirent.name.replace('.json', ''));
+    }
     console.warn(`Artifacts directory not found for ${solFileName}`);
     return [];
   }
@@ -97,22 +119,50 @@ function getAllContractArtifactsFromSolFile(solFileName: string): string[] {
 
 /**
  * Find the .sol file that contains a given contract by scanning artifacts
+ * Checks both Foundry and Hardhat artifact locations
  */
 function findSolFileForContract(contractName: string): string | null {
-  const contractsDir = `${ARTIFACTS_DIR}/contracts`;
-  
-  if (!fs.existsSync(contractsDir)) {
-    return null;
+  // Try Foundry structure first: foundry/out/contracts/ERC20.sol/ERC20Token.json
+  const foundryContractsDir = `${FOUNDRY_ARTIFACTS_DIR}/contracts`;
+  if (fs.existsSync(foundryContractsDir)) {
+    const solDirs = fs.readdirSync(foundryContractsDir, { withFileTypes: true })
+      .filter(dirent => dirent.isDirectory() && dirent.name.endsWith('.sol'))
+      .map(dirent => dirent.name);
+
+    for (const solDir of solDirs) {
+      const artifactPath = `${foundryContractsDir}/${solDir}/${contractName}.json`;
+      if (fs.existsSync(artifactPath)) {
+        return solDir;
+      }
+    }
   }
 
-  const solDirs = fs.readdirSync(contractsDir, { withFileTypes: true })
-    .filter(dirent => dirent.isDirectory() && dirent.name.endsWith('.sol'))
-    .map(dirent => dirent.name);
+  // Try Foundry alternative structure: foundry/out/ERC20.sol/ERC20Token.json
+  if (fs.existsSync(FOUNDRY_ARTIFACTS_DIR)) {
+    const solDirs = fs.readdirSync(FOUNDRY_ARTIFACTS_DIR, { withFileTypes: true })
+      .filter(dirent => dirent.isDirectory() && dirent.name.endsWith('.sol'))
+      .map(dirent => dirent.name);
 
-  for (const solDir of solDirs) {
-    const artifactPath = `${contractsDir}/${solDir}/${contractName}.json`;
-    if (fs.existsSync(artifactPath)) {
-      return solDir;
+    for (const solDir of solDirs) {
+      const artifactPath = `${FOUNDRY_ARTIFACTS_DIR}/${solDir}/${contractName}.json`;
+      if (fs.existsSync(artifactPath)) {
+        return solDir;
+      }
+    }
+  }
+
+  // Fallback to Hardhat structure: artifacts-pvm/contracts/ERC20.sol/ERC20Token.json
+  const hardhatContractsDir = `${HARDHAT_ARTIFACTS_DIR}/contracts`;
+  if (fs.existsSync(hardhatContractsDir)) {
+    const solDirs = fs.readdirSync(hardhatContractsDir, { withFileTypes: true })
+      .filter(dirent => dirent.isDirectory() && dirent.name.endsWith('.sol'))
+      .map(dirent => dirent.name);
+
+    for (const solDir of solDirs) {
+      const artifactPath = `${hardhatContractsDir}/${solDir}/${contractName}.json`;
+      if (fs.existsSync(artifactPath)) {
+        return solDir;
+      }
     }
   }
 
@@ -120,14 +170,25 @@ function findSolFileForContract(contractName: string): string | null {
 }
 
 // Use either hardhat-deploy directory structure if it exists, or directly get contracts from artifacts
-async function getContractDataFromDeployments(hre: HardhatRuntimeEnvironment, deployedContracts?: Record<string, string>) {
+async function getContractDataFromDeployments(hre: HardhatRuntimeEnvironment, deployedContracts?: Record<string, string>, chainIdOverride?: string) {
   // If deployed contracts are provided, use them first (prioritize over deployments directory)
   if (deployedContracts && Object.keys(deployedContracts).length > 0) {
     console.log("🎯 Using provided deployed contract addresses...");
     
-    // Get the network chainId
-    const network = await hre.network.provider.send('eth_chainId');
-    const chainId = parseInt(network, 16).toString();
+    // Get the network chainId - use override if provided, otherwise try to get from Hardhat
+    let chainId: string;
+    if (chainIdOverride) {
+      chainId = chainIdOverride;
+    } else {
+      try {
+        const network = await hre.network.provider.send('eth_chainId');
+        chainId = parseInt(network, 16).toString();
+      } catch (error) {
+        // If we can't get chainId from Hardhat (e.g., when using ethers directly), use default
+        console.warn("⚠️  Could not get chainId from Hardhat network. Using default: 420420422 (Paseo)");
+        chainId = "420420422"; // Default to Paseo testnet
+      }
+    }
     const contracts = {} as Record<string, any>;
     const processedSolFiles = new Set<string>(); // Track which .sol files we've already processed
     
@@ -158,16 +219,37 @@ async function getContractDataFromDeployments(hre: HardhatRuntimeEnvironment, de
       
       // IMPORTANT: Only add the artifact that matches the deployed contract name
       // We only deployed the contract specified in contractName, not all contracts from the .sol file
-      const artifactPath = `${ARTIFACTS_DIR}/contracts/${solFile}/${contractName}.json`;
+      // Try multiple possible paths for Foundry artifacts
+      let artifactPath = `${FOUNDRY_ARTIFACTS_DIR}/contracts/${solFile}/${contractName}.json`;
+      if (!fs.existsSync(artifactPath)) {
+        artifactPath = `${FOUNDRY_ARTIFACTS_DIR}/${solFile}/${contractName}.json`;
+      }
+      if (!fs.existsSync(artifactPath)) {
+        artifactPath = `${HARDHAT_ARTIFACTS_DIR}/contracts/${solFile}/${contractName}.json`;
+      }
       
       if (!fs.existsSync(artifactPath)) {
-        console.warn(`⚠️  Artifact not found for deployed contract "${contractName}" at ${artifactPath}`);
+        console.warn(`⚠️  Artifact not found for deployed contract "${contractName}"`);
+        console.warn(`   Tried: ${FOUNDRY_ARTIFACTS_DIR}/contracts/${solFile}/${contractName}.json`);
+        console.warn(`   Tried: ${FOUNDRY_ARTIFACTS_DIR}/${solFile}/${contractName}.json`);
+        console.warn(`   Tried: ${HARDHAT_ARTIFACTS_DIR}/contracts/${solFile}/${contractName}.json`);
         console.warn(`   Available artifacts in ${solFile}: ${allArtifacts.join(', ')}`);
         continue;
       }
       
-      const { abi, metadata } = JSON.parse(fs.readFileSync(artifactPath).toString());
-      const inheritedFunctions = metadata ? getInheritedFunctions(JSON.parse(metadata).sources, contractName) : {};
+      const artifactContent = JSON.parse(fs.readFileSync(artifactPath).toString());
+      const { abi } = artifactContent;
+      // Foundry artifacts may have metadata as a string or object, or may not have it at all
+      let metadata = artifactContent.metadata;
+      if (typeof metadata === 'string') {
+        try {
+          metadata = JSON.parse(metadata);
+        } catch (e) {
+          // If metadata is not valid JSON, set to null
+          metadata = null;
+        }
+      }
+      const inheritedFunctions = metadata && metadata.sources ? getInheritedFunctions(metadata.sources, contractName) : {};
       
       contracts[contractName] = { 
         address: contractAddress, 
@@ -213,9 +295,9 @@ async function getContractDataFromDeployments(hre: HardhatRuntimeEnvironment, de
  * Generates the TypeScript contract definition file based on the json output of the contract deployment scripts
  * This script should be run last.
  */
-const generateTsAbis = async function (hre: HardhatRuntimeEnvironment, deployedContracts?: Record<string, string>) {
+const generateTsAbis = async function (hre: HardhatRuntimeEnvironment, deployedContracts?: Record<string, string>, chainIdOverride?: string) {
   const TARGET_DIR = "../nextjs/contracts/";
-  const allContractsData = await getContractDataFromDeployments(hre, deployedContracts);
+  const allContractsData = await getContractDataFromDeployments(hre, deployedContracts, chainIdOverride);
 
   const fileContent = Object.entries(allContractsData).reduce((content, [chainId, chainConfig]) => {
     return `${content}${parseInt(chainId).toFixed(0)}:${JSON.stringify(chainConfig, null, 2)},`;
